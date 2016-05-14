@@ -9,4 +9,12 @@ data plane patches to OpenSSH
 
 To apply a patch:
 
-  patch -p1 -d openssh-x.ypz/ < openssh-x.ypz.dataplane.patch
+```
+patch -p1 -d openssh-x.ypz/ < openssh-x.ypz.dataplane.patch
+```
+
+To create a patch:
+
+```
+diff -rupN openssh-x.ypz/ openssh-x.ypz.dataplane/ > openssh-x.ypz.dataplane.patch
+```
