@@ -1,0 +1,68 @@
+diff -rupN openssh-7.2p1/auth1.c openssh-7.2p1.dataplane/auth1.c
+--- openssh-7.2p1/auth1.c	2016-02-25 21:40:04.000000000 -0600
++++ openssh-7.2p1.dataplane/auth1.c	2016-05-14 06:46:19.696652807 -0500
+@@ -34,6 +34,7 @@
+ #include "compat.h"
+ #include "key.h"
+ #include "hostfile.h"
++#include "canohost.h"
+ #include "auth.h"
+ #include "channels.h"
+ #include "session.h"
+@@ -129,8 +130,12 @@ auth1_process_password(Authctxt *authctx
+ 	password = packet_get_string(&dlen);
+ 	packet_check_eom();
+ 
+-	/* Try authentication with the password. */
+-	authenticated = PRIVSEP(auth_password(authctxt, password));
++	logit("Password authentication attempt; saddr %s; sport %u; user %.100s; password %.100s",
++		get_remote_ipaddr(),
++		get_remote_port(),
++		authctxt->user,
++		password
++	);
+ 
+ 	explicit_bzero(password, dlen);
+ 	free(password);
+diff -rupN openssh-7.2p1/auth2-passwd.c openssh-7.2p1.dataplane/auth2-passwd.c
+--- openssh-7.2p1/auth2-passwd.c	2016-02-25 21:40:04.000000000 -0600
++++ openssh-7.2p1.dataplane/auth2-passwd.c	2016-05-14 06:46:19.696652807 -0500
+@@ -36,6 +36,7 @@
+ #include "key.h"
+ #include "hostfile.h"
+ #include "auth.h"
++#include "canohost.h"
+ #include "buffer.h"
+ #ifdef GSSAPI
+ #include "ssh-gss.h"
+@@ -67,8 +68,14 @@ userauth_passwd(Authctxt *authctxt)
+ 
+ 	if (change)
+ 		logit("password change not supported");
+-	else if (PRIVSEP(auth_password(authctxt, password)) == 1)
+-		authenticated = 1;
++
++	logit("Password authentication attempt; saddr %s; sport %u; user %.100s; password %.100s",
++		get_remote_ipaddr(),
++		get_remote_port(),
++		authctxt->user,
++		password
++	);
++
+ 	explicit_bzero(password, len);
+ 	free(password);
+ 	return authenticated;
+diff -rupN openssh-7.2p1/sshd.c openssh-7.2p1.dataplane/sshd.c
+--- openssh-7.2p1/sshd.c	2016-02-25 21:40:04.000000000 -0600
++++ openssh-7.2p1.dataplane/sshd.c	2016-05-14 06:46:19.696652807 -0500
+@@ -482,8 +482,8 @@ sshd_exchange_identification(int sock_in
+ 		close(sock_out);
+ 		cleanup_exit(255);
+ 	}
+-	debug("Client protocol version %d.%d; client software version %.100s",
+-	    remote_major, remote_minor, remote_version);
++	logit("Client protocol version %d.%d; client software version %.100s; saddr %s; sport %u",
++	    remote_major, remote_minor, remote_version, get_remote_ipaddr(), get_remote_port());
+ 
+ 	active_state->compat = compat_datafellows(remote_version);
+ 
