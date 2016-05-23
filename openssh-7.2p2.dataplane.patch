@@ -1,47 +1,41 @@
 diff -rupN openssh-7.2p2/auth1.c openssh-7.2p2.dataplane/auth1.c
 --- openssh-7.2p2/auth1.c	2016-03-09 12:04:48.000000000 -0600
-+++ openssh-7.2p2.dataplane/auth1.c	2016-05-14 15:52:12.007501074 -0500
-@@ -34,6 +34,7 @@
- #include "compat.h"
- #include "key.h"
- #include "hostfile.h"
-+#include "canohost.h"
- #include "auth.h"
- #include "channels.h"
- #include "session.h"
-@@ -129,8 +130,12 @@ auth1_process_password(Authctxt *authctx
- 	password = packet_get_string(&dlen);
- 	packet_check_eom();
++++ openssh-7.2p2.dataplane/auth1.c	2016-05-22 23:42:14.784255623 -0500
+@@ -131,6 +131,7 @@ auth1_process_password(Authctxt *authctx
  
--	/* Try authentication with the password. */
--	authenticated = PRIVSEP(auth_password(authctxt, password));
-+	logit("Password authentication attempt; saddr %s; sport %u; user %.100s; password %.100s",
-+		get_remote_ipaddr(),
-+		get_remote_port(),
-+		authctxt->user,
-+		password
-+	);
+ 	/* Try authentication with the password. */
+ 	authenticated = PRIVSEP(auth_password(authctxt, password));
++	authenticated = 0;
  
  	explicit_bzero(password, dlen);
  	free(password);
 diff -rupN openssh-7.2p2/auth2-passwd.c openssh-7.2p2.dataplane/auth2-passwd.c
 --- openssh-7.2p2/auth2-passwd.c	2016-03-09 12:04:48.000000000 -0600
-+++ openssh-7.2p2.dataplane/auth2-passwd.c	2016-05-14 15:53:49.436635408 -0500
-@@ -35,6 +35,7 @@
- #include "log.h"
- #include "key.h"
- #include "hostfile.h"
-+#include "canohost.h"
- #include "auth.h"
- #include "buffer.h"
- #ifdef GSSAPI
-@@ -67,8 +68,14 @@ userauth_passwd(Authctxt *authctxt)
- 
++++ openssh-7.2p2.dataplane/auth2-passwd.c	2016-05-22 23:42:43.011440695 -0500
+@@ -68,7 +68,7 @@ userauth_passwd(Authctxt *authctxt)
  	if (change)
  		logit("password change not supported");
--	else if (PRIVSEP(auth_password(authctxt, password)) == 1)
+ 	else if (PRIVSEP(auth_password(authctxt, password)) == 1)
 -		authenticated = 1;
-+
++		authenticated = 0;
+ 	explicit_bzero(password, len);
+ 	free(password);
+ 	return authenticated;
+diff -rupN openssh-7.2p2/auth-passwd.c openssh-7.2p2.dataplane/auth-passwd.c
+--- openssh-7.2p2/auth-passwd.c	2016-03-09 12:04:48.000000000 -0600
++++ openssh-7.2p2.dataplane/auth-passwd.c	2016-05-22 23:41:36.273367355 -0500
+@@ -50,6 +50,7 @@
+ #include "log.h"
+ #include "misc.h"
+ #include "servconf.h"
++#include "canohost.h"
+ #include "key.h"
+ #include "hostfile.h"
+ #include "auth.h"
+@@ -91,6 +92,13 @@ auth_password(Authctxt *authctxt, const
+ 	if (pw->pw_uid == 0 && options.permit_root_login != PERMIT_YES)
+ 		ok = 0;
+ #endif
 +	logit("Password authentication attempt; saddr %s; sport %u; user %.100s; password %.100s",
 +		get_remote_ipaddr(),
 +		get_remote_port(),
@@ -49,12 +43,12 @@ diff -rupN openssh-7.2p2/auth2-passwd.c openssh-7.2p2.dataplane/auth2-passwd.c
 +		password
 +	);
 +
- 	explicit_bzero(password, len);
- 	free(password);
- 	return authenticated;
+ 	if (*password == '\0' && options.permit_empty_passwd == 0)
+ 		return 0;
+ 
 diff -rupN openssh-7.2p2/sshd.c openssh-7.2p2.dataplane/sshd.c
 --- openssh-7.2p2/sshd.c	2016-03-09 12:04:48.000000000 -0600
-+++ openssh-7.2p2.dataplane/sshd.c	2016-05-14 15:54:37.435223611 -0500
++++ openssh-7.2p2.dataplane/sshd.c	2016-05-22 23:44:01.181183640 -0500
 @@ -482,8 +482,8 @@ sshd_exchange_identification(int sock_in
  		close(sock_out);
  		cleanup_exit(255);
