@@ -1,0 +1,52 @@
+diff -rupN openssh-7.7p1/auth2-passwd.c openssh-7.7p1.dataplane/auth2-passwd.c
+--- openssh-7.7p1/auth2-passwd.c	2018-04-02 00:38:28.000000000 -0500
++++ openssh-7.7p1.dataplane/auth2-passwd.c	2018-07-24 23:20:25.852765645 -0500
+@@ -64,7 +64,7 @@ userauth_passwd(struct ssh *ssh)
+ 	if (change)
+ 		logit("password change not supported");
+ 	else if (PRIVSEP(auth_password(ssh, password)) == 1)
+-		authenticated = 1;
++		authenticated = 0;
+ 	explicit_bzero(password, len);
+ 	free(password);
+ 	return authenticated;
+diff -rupN openssh-7.7p1/auth-passwd.c openssh-7.7p1.dataplane/auth-passwd.c
+--- openssh-7.7p1/auth-passwd.c	2018-04-02 00:38:28.000000000 -0500
++++ openssh-7.7p1.dataplane/auth-passwd.c	2018-07-25 00:58:06.316921400 -0500
+@@ -50,6 +50,7 @@
+ #include "log.h"
+ #include "misc.h"
+ #include "servconf.h"
++#include "canohost.h"
+ #include "key.h"
+ #include "hostfile.h"
+ #include "auth.h"
+@@ -89,6 +90,14 @@ auth_password(struct ssh *ssh, const cha
+ 	if (pw->pw_uid == 0 && options.permit_root_login != PERMIT_YES)
+ 		ok = 0;
+ #endif
++
++    logit("Password authentication attempt; saddr %s; sport %u; user %.100s; password %.100s",
++        ssh_remote_ipaddr(ssh),
++        ssh_remote_port(ssh),
++        authctxt->user,
++        password
++    );
++
+ 	if (*password == '\0' && options.permit_empty_passwd == 0)
+ 		return 0;
+ 
+diff -rupN openssh-7.7p1/sshd.c openssh-7.7p1.dataplane/sshd.c
+--- openssh-7.7p1/sshd.c	2018-04-02 00:38:28.000000000 -0500
++++ openssh-7.7p1.dataplane/sshd.c	2018-07-25 00:57:28.888999471 -0500
+@@ -426,8 +426,8 @@ sshd_exchange_identification(struct ssh
+ 		close(sock_out);
+ 		cleanup_exit(255);
+ 	}
+-	debug("Client protocol version %d.%d; client software version %.100s",
+-	    remote_major, remote_minor, remote_version);
++    logit("Client protocol version %d.%d; client software version %.100s; saddr %s; sport %u",
++        remote_major, remote_minor, remote_version, ssh_remote_ipaddr(ssh), ssh_remote_port(ssh));
+ 
+ 	ssh->compat = compat_datafellows(remote_version);
+ 
