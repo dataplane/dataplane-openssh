@@ -35,5 +35,5 @@ While not perfectly clean and packaged, our test build process includes
 the following steps:
 
 * Build LibreSSL from source and install into the default directory prefix ```/usr/local```
-* Add /usr/local/lib to /etc/ld.conf.d/local.conf and run ldconfig
-* Setup OpenSSH build with ```LIBS=-lpthread ./configure --with-ssl=/usr/local/lib```
+* Add /usr/local/lib to /etc/ld.so.conf.d/local.conf and run ldconfig
+* Setup OpenSSH build with ```LIBS=-lpthread ./configure --with-ssl-dir=/usr/local/lib```
