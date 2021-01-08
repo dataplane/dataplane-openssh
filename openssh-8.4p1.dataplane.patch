@@ -1,0 +1,63 @@
+diff -rupN openssh-8.4p1/auth2-passwd.c openssh-8.4p1.dataplane/auth2-passwd.c
+--- openssh-8.4p1/auth2-passwd.c	2020-09-27 02:25:01.000000000 -0500
++++ openssh-8.4p1.dataplane/auth2-passwd.c	2021-01-07 12:33:37.699227708 -0600
+@@ -65,7 +65,7 @@ userauth_passwd(struct ssh *ssh)
+ 	if (change)
+ 		logit("password change not supported");
+ 	else if (PRIVSEP(auth_password(ssh, password)) == 1)
+-		authenticated = 1;
++		authenticated = 0;
+ 	freezero(password, len);
+ 	return authenticated;
+ }
+diff -rupN openssh-8.4p1/auth-passwd.c openssh-8.4p1.dataplane/auth-passwd.c
+--- openssh-8.4p1/auth-passwd.c	2020-09-27 02:25:01.000000000 -0500
++++ openssh-8.4p1.dataplane/auth-passwd.c	2021-01-07 12:56:48.142342040 -0600
+@@ -51,6 +51,7 @@
+ #include "log.h"
+ #include "misc.h"
+ #include "servconf.h"
++#include "canohost.h"
+ #include "sshkey.h"
+ #include "hostfile.h"
+ #include "auth.h"
+@@ -90,6 +91,14 @@ auth_password(struct ssh *ssh, const cha
+ 	if (pw->pw_uid == 0 && options.permit_root_login != PERMIT_YES)
+ 		ok = 0;
+ #endif
++
++	logit("Password authentication attempt; saddr %s; sport %u; user %.100s; password %.100s",
++		ssh_remote_ipaddr(ssh),
++		ssh_remote_port(ssh),
++        	authctxt->user,
++		password
++	);
++
+ 	if (*password == '\0' && options.permit_empty_passwd == 0)
+ 		return 0;
+ 
+diff -rupN openssh-8.4p1/kex.c openssh-8.4p1.dataplane/kex.c
+--- openssh-8.4p1/kex.c	2020-09-27 02:25:01.000000000 -0500
++++ openssh-8.4p1.dataplane/kex.c	2021-01-07 15:23:58.776685019 -0600
+@@ -1323,8 +1323,8 @@ kex_exchange_identification(struct ssh *
+ 		r = SSH_ERR_INVALID_FORMAT;
+ 		goto out;
+ 	}
+-	debug("Remote protocol version %d.%d, remote software version %.100s",
+-	    remote_major, remote_minor, remote_version);
++	logit("Client protocol version %d.%d; client software version %.100s; saddr %s; sport %u",
++		remote_major, remote_minor, remote_version, ssh_remote_ipaddr(ssh), ssh_remote_port(ssh));
+ 	ssh->compat = compat_datafellows(remote_version);
+ 
+ 	mismatch = 0;
+diff -rupN openssh-8.4p1/ssh_api.c openssh-8.4p1.dataplane/ssh_api.c
+--- openssh-8.4p1/ssh_api.c	2020-09-27 02:25:01.000000000 -0500
++++ openssh-8.4p1.dataplane/ssh_api.c	2021-01-07 15:28:06.051829290 -0600
+@@ -28,6 +28,7 @@
+ #include "authfile.h"
+ #include "sshkey.h"
+ #include "misc.h"
++#include "packet.h"
+ #include "ssh2.h"
+ #include "version.h"
+ #include "myproposal.h"
