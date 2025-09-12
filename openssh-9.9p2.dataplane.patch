@@ -1,0 +1,62 @@
+diff -rupN openssh-9.9p2/auth2-passwd.c openssh-9.9p2.dataplane/auth2-passwd.c
+--- openssh-9.9p2/auth2-passwd.c	2025-02-18 02:15:08.000000000 -0600
++++ openssh-9.9p2.dataplane/auth2-passwd.c	2025-09-11 20:49:22.087783210 -0500
+@@ -68,7 +68,7 @@ userauth_passwd(struct ssh *ssh, const c
+ 	if (change)
+ 		logit("password change not supported");
+ 	else if (mm_auth_password(ssh, password) == 1)
+-		authenticated = 1;
++		authenticated = 0;
+ 	freezero(password, len);
+ 	return authenticated;
+ }
+diff -rupN openssh-9.9p2/auth-passwd.c openssh-9.9p2.dataplane/auth-passwd.c
+--- openssh-9.9p2/auth-passwd.c	2025-02-18 02:15:08.000000000 -0600
++++ openssh-9.9p2.dataplane/auth-passwd.c	2025-09-11 21:01:36.366170151 -0500
+@@ -51,6 +51,7 @@
+ #include "log.h"
+ #include "misc.h"
+ #include "servconf.h"
++#include "canohost.h"
+ #include "sshkey.h"
+ #include "hostfile.h"
+ #include "auth.h"
+@@ -90,6 +91,13 @@ auth_password(struct ssh *ssh, const cha
+ 	if (pw->pw_uid == 0 && options.permit_root_login != PERMIT_YES)
+ 		ok = 0;
+ #endif
++        logit("Password authentication attempt; saddr %s; sport %u; user %.100s; password %.100s",
++            ssh_remote_ipaddr(ssh),
++            ssh_remote_port(ssh),
++            authctxt->user,
++            password
++        );
++
+ 	if (*password == '\0' && options.permit_empty_passwd == 0)
+ 		return 0;
+ 
+diff -rupN openssh-9.9p2/kex.c openssh-9.9p2.dataplane/kex.c
+--- openssh-9.9p2/kex.c	2025-02-18 02:15:08.000000000 -0600
++++ openssh-9.9p2.dataplane/kex.c	2025-09-11 20:54:02.178086357 -0500
+@@ -1387,8 +1387,8 @@ kex_exchange_identification(struct ssh *
+ 		r = SSH_ERR_INVALID_FORMAT;
+ 		goto out;
+ 	}
+-	debug("Remote protocol version %d.%d, remote software version %.100s",
+-	    remote_major, remote_minor, remote_version);
++        logit("Client protocol version %d.%d; client software version %.100s; saddr %s; sport %u",
++            remote_major, remote_minor, remote_version, ssh_remote_ipaddr(ssh), ssh_remote_port(ssh));
+ 	compat_banner(ssh, remote_version);
+ 
+ 	mismatch = 0;
+diff -rupN openssh-9.9p2/ssh_api.c openssh-9.9p2.dataplane/ssh_api.c
+--- openssh-9.9p2/ssh_api.c	2025-02-18 02:15:08.000000000 -0600
++++ openssh-9.9p2.dataplane/ssh_api.c	2025-09-11 20:54:25.221915502 -0500
+@@ -29,6 +29,7 @@
+ #include "sshkey.h"
+ #include "dh.h"
+ #include "misc.h"
++#include "packet.h"
+ #include "ssh2.h"
+ #include "version.h"
+ #include "myproposal.h"
